@@ -1,0 +1,22 @@
+This is a CLI wrapper for the WordPress Importer found at http://wordpress.org/extend/plugins/wordpress-importer/
+
+It's reusing most of the code of the original import but allows it's execution on the command line.
+It's required to have the WordPress Importer installed.
+
+Installation:
+
+Grab the wordpress-importer-cli.php and place it in the wordpress-importer plugin folder ( usually wp-content/plugins/wordpress-importer ).
+
+Usage:
+
+Call the script on the command line with the following arguments
+
+Argument --blog: Blog ID of the blog you like to import to
+Argument --file: Full Path to WXR import file
+Argument --attachments: Import attachments (true/false)
+Argument --user: Username/ID the import should run as
+Argument --author_mapping: empty or php file with User mapping array $cli_user_map = array( <old_user> => <new_user_name/email/id> ); defined. if the file does not exist it will be created for you
+
+Sorry, not much documentation at this point and all needs a lot of testing. 
+
+Feedback welcome!
