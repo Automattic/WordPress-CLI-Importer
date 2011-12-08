@@ -17,6 +17,8 @@ Argument --attachments: Import attachments (true/false)
 Argument --user: Username/ID the import should run as
 Argument --author_mapping: empty or php file with User mapping array $cli_user_map = array( <old_user> => <new_user_name/email/id> ); defined. if the file does not exist it will be created for you
 
+The script also tries to find the best matching user on the current blog based on the similarity of the users. Please make sure to check the author mapping file before running the import. 
+
 Sorry, not much documentation at this point and all needs a lot of testing. 
 
 Feedback welcome!

@@ -249,6 +249,7 @@ class WordPress_CLI_Import extends WP_Import {
 	}
 
 	private function validate_author_map( $mapping_file_name ) {
+		// return true; // uncomment this if you don't have any authors
 		if ( empty( $mapping_file_name ) ) {
 			$this->debug_msg( "no mapping provided, all smooth!" );
 			return true;
@@ -258,16 +259,38 @@ class WordPress_CLI_Import extends WP_Import {
 			return false;
 		} 
 		
+		$blog_users = array();
+		$_blog_users = get_users(); 
+		foreach( $_blog_users as $blog_user ) {
+			$blog_users[$blog_user->ID] = $blog_user;
+		}
+
 		if ( !file_exists( $mapping_file_name ) ) {
 			$this->debug_msg( sprintf( "mapping file %s does not exist", $mapping_file_name ) );
 			if ( touch( $mapping_file_name ) ) {
 				$default_user = $this->args->user;
+				
 				foreach( $wxr_authors as $wp_author => $wp_author_data ) {
-					$tmp_mapping[ sanitize_user( $wp_author, true ) ] = $default_user;
+					$user_suggestion = $this->suggest_user( sanitize_user( $wp_author, true ), $blog_users );
+					if ( empty( $user_suggestion ) )
+						$user_suggestion = $default_user;
+						
+					$tmp_mapping[ sanitize_user( $wp_author, true ) ] = $user_suggestion;
 				}
 			}
 			if ( !empty( $tmp_mapping ) ) {
-				$content = "<?php\n\n\$cli_user_map = " . var_export( $tmp_mapping, true ) . ";\n\n";
+				$user_string = "array( \n";
+				
+				foreach( $tmp_mapping as $from_user => $to_user ) {
+					if ( isset( $blog_users[$to_user] ) && $to_user <> $default_user )
+						$comment = sprintf( "\t// %s, %s, %s", $blog_users[$to_user]->display_name, $blog_users[$to_user]->user_email, $blog_users[$to_user]->user_login );
+					else 
+						$comment = sprintf( "\t// default: %s", $blog_users[$to_user]->user_login );
+					$user_string .= sprintf( "\t'%s'\t\t\t => \t%d,%s\n", $from_user, $to_user, $comment );
+				}
+				
+				$user_string .= ");";
+				$content = "<?php\n\n\$cli_user_map = " . $user_string . "\n\n";
 				file_put_contents( $mapping_file_name, $content );
 				$this->debug_msg( sprintf( "we created a default mapping file %s for you. please edit this before you continue", $mapping_file_name ) );
 				die();
@@ -313,6 +336,7 @@ class WordPress_CLI_Import extends WP_Import {
 			
 		return $result;
 	}
+
 	
 	
 	public function backfill_attachment_urls() {
@@ -337,6 +361,36 @@ class WordPress_CLI_Import extends WP_Import {
 			if ( $new_post_content <> $post->post_content )
 				$wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->posts} SET post_content = %s WHERE ID = %d", $new_post_content, $post_id ) );
 		}
+	}
+	
+	private function suggest_user( $author_in, $users ) {
+		$shortest = -1;
+		$shortestavg = array();
+	
+		$threshold = floor( ( strlen( $author_in ) / 100 ) * 10 ); // 10 % of the strlen are valid
+		foreach ( $users as $user ) {
+			$levs[] = levenshtein( $author_in, $user->display_name );
+			$levs[] = levenshtein( $author_in, $user->user_login );
+			$levs[] = levenshtein( $author_in, $user->user_email );
+			$levs[] = levenshtein( $author_in, array_shift( explode( "@", $user->user_email ) ) );
+			arsort( $levs );
+			$lev = array_pop( $levs );
+			if ( 0 == $lev ) {
+				$closest = $user->user_id;
+				$shortest = 0;
+				break;
+			}
+	
+			if ( ( $lev <= $shortest || $shortest < 0 ) && $lev <= $threshold ) {
+				$closest  = $user->user_id;
+				$shortest = $lev;
+			}
+			$shortestavg[] = $lev;
+		}	
+		// in case all usernames have a common pattern
+		if ( $shortest > ( array_sum( $shortestavg ) / count( $shortestavg ) ) )
+			return false;
+		return $closest;
 	}
 }
 
